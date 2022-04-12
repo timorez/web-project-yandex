@@ -1,31 +1,36 @@
 from flask import Flask
 from flask import render_template
 from flask import redirect
-from loginform import *
 from data import db_session
 from data.users import User
-from forms.user import RegisterForm
+from forms.registerform import RegisterForm
+from forms.loginform import LoginForm
+from flask_login import login_user, login_required, logout_user, LoginManager, current_user
 
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 
-@app.route('/index')
+@app.route('/main')
 def index():
-    return render_template('index.html')
+    if current_user.is_authenticated:
+        return render_template('index.html', text='main')
+    return render_template('index.html', text='не авторизован')
 
 
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/sign_up', methods=['GET', 'POST'])
-def login():
+def registration():
     form = RegisterForm()
     if form.validate_on_submit():
         db_sess = db_session.create_session()
         if db_sess.query(User).filter(User.email == form.email.data).first():
-            return render_template('web_sign_up.html', title='Регистрация',
+            return render_template('web_sign_up.html', title='Sign up',
                                    form=form,
-                                   message="Такой пользователь уже есть")
+                                   message="This user is already registered")
         user = User(
             email=form.email.data,
             password=form.password.data
@@ -34,13 +39,37 @@ def login():
         db_sess.add(user)
         db_sess.commit()
         return redirect('/signin')
-    return render_template('web_sign_up.html', title='Sign up', form=form)
+    return render_template('web_sign_up.html', title='Sign up', form=form,
+                           message='')
 
 
-@app.route('/signin')
-def signin():
-    form = RegisterForm()
-    return render_template('web_sign_in.html', title='Sign in', form=form)
+@app.route('/signin', methods=['GET', 'POST'])
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        user = db_sess.query(User).filter(User.email == form.email.data).first()
+        if user and user.check_password(form.password.data):
+            login_user(user, remember=form.remember_me.data)
+            return redirect('/main')
+        return render_template('web_sign_in.html.html',
+                               message="Неправильный логин или пароль",
+                               form=form)
+    return render_template('web_sign_in.html', title='Авторизация', form=form,
+                           message='')
+
+
+@login_manager.user_loader
+def load_user(email):
+    db_sess = db_session.create_session()
+    return db_sess.query(User).get(email)
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect("/")
 
 
 if __name__ == '__main__':
