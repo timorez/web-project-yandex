@@ -5,20 +5,23 @@ from data import db_session
 from data.users import User
 from forms.registerform import RegisterForm
 from forms.loginform import LoginForm
+from forms.aboutform import AboutForm
 from flask_login import login_user, login_required, logout_user, LoginManager, current_user
-
+import requests
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
 login_manager = LoginManager()
 login_manager.init_app(app)
 
+url = 'https://api.opendota.com/api/players/{}/wl'
+
 
 @app.route('/main')
 def index():
     if current_user.is_authenticated:
         return render_template('index.html', text='main')
-    return render_template('index.html', text='не авторизован')
+    return render_template('not_authorised.html', text='не авторизован')
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -52,11 +55,29 @@ def login():
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
             return redirect('/main')
-        return render_template('web_sign_in.html.html',
+        return render_template('web_sign_in.html',
                                message="Неправильный логин или пароль",
                                form=form)
     return render_template('web_sign_in.html', title='Авторизация', form=form,
                            message='')
+
+
+@app.route('/about', methods=['GET', 'POST'])
+def about():
+    form = AboutForm()
+    wr = 0
+    if current_user.is_authenticated:
+        if form.validate_on_submit():
+            resp = requests.get(url.format(form.id.data)).json()
+            if len(resp) > 1:
+                if resp['win'] != 0 and resp['lose'] != 0:
+                    wr = str(resp['win'] / (resp['win'] + resp['lose']))
+                else:
+                    wr = 'no data(new user)'
+            else:
+                wr = 'incorrect id'
+        return render_template('about.html', form=form, response='wr - {}'.format(wr))
+    return render_template('not_authorised.html')
 
 
 @login_manager.user_loader
