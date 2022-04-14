@@ -3,9 +3,11 @@ from flask import render_template
 from flask import redirect
 from data import db_session
 from data.users import User
+from data.heroes import Hero
 from forms.registerform import RegisterForm
 from forms.loginform import LoginForm
 from forms.aboutform import AboutForm
+from forms.pickform import PickForm
 from flask_login import login_user, login_required, logout_user, LoginManager, current_user
 import requests
 
@@ -17,10 +19,23 @@ login_manager.init_app(app)
 url = 'https://api.opendota.com/api/players/{}/wl'
 
 
-@app.route('/main')
+@app.route('/main', methods=['GET', 'POST'])
 def index():
+    form = PickForm()
+    percent = 0
     if current_user.is_authenticated:
-        return render_template('index.html', text='main')
+        if form.validate_on_submit():
+            carry = form.carry.data.strip()
+            mid = form.mid.data.strip()
+            off = form.off.data.strip()
+            four = form.four.data.strip()
+            five = form.five.data.strip()
+            try:
+                percent = main_analysis([carry, mid, off, four, five])
+            except:
+                percent = 'wrong names'
+        return render_template('index.html', form=form,
+                               result='we expect victory with probability - {}persent'.format(percent))
     return render_template('not_authorised.html', text='не авторизован')
 
 
@@ -90,7 +105,40 @@ def load_user(email):
 @login_required
 def logout():
     logout_user()
-    return redirect("/")
+    return redirect('/')
+
+
+def main_analysis(hero_names):
+    db_sess = db_session.create_session()
+    res = ''
+    carry = db_sess.query(Hero).filter(Hero.name == hero_names[0]).first()
+    mid = db_sess.query(Hero).filter(Hero.name == hero_names[1]).first()
+    off = db_sess.query(Hero).filter(Hero.name == hero_names[2]).first()
+    four = db_sess.query(Hero).filter(Hero.name == hero_names[3]).first()
+    five = db_sess.query(Hero).filter(Hero.name == hero_names[4]).first()
+    lst = [carry, mid, off, four, five]
+    if lst.count(carry) == 1 and lst.count(mid) == 1 and \
+            lst.count(off) == 1 and lst.count(four) == 1 and lst.count(five) == 1:
+        res = 0
+        farm = 0
+        meta = 0
+        front = 0
+        lane = 0
+        active_sup = 0
+        for i in lst:
+            farm += i.farm
+            meta += i.meta
+            front += i.front
+            lane += i.lane
+            active_sup += i.active_sup
+        res += 0.2 * ((farm / 9) * 100)
+        res += 0.2 * ((meta / 5) * 100)
+        res += 0.2 * ((front / 1) * 100)
+        res += 0.2 * ((lane / 5) * 100)
+        res += 0.2 * ((active_sup / 2) * 100)
+    else:
+        res = 'same heroes'
+    return res
 
 
 if __name__ == '__main__':
