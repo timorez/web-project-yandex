@@ -10,6 +10,7 @@ from forms.aboutform import AboutForm
 from forms.pickform import PickForm
 from flask_login import login_user, login_required, logout_user, LoginManager, current_user
 import requests
+import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
@@ -143,4 +144,5 @@ def main_analysis(hero_names):
 
 if __name__ == '__main__':
     db_session.global_init('db/Users.sqlite')
-    app.run(port=8080, host='127.0.0.1')
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
