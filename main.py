@@ -108,6 +108,11 @@ def logout():
     return redirect('/')
 
 
+@app.route('/heroes')
+def heroes():
+    return render_template('heroes.html', title='heroes')
+
+
 def main_analysis(hero_names):
     db_sess = db_session.create_session()
     res = ''
